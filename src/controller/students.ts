@@ -1,12 +1,14 @@
 import type { Request, RequestHandler, Response } from "express";
 import type { Pool } from "pg";
 import {
-    deleteStudent,
-    insertStudent,
     selectAllUsers,
     selectUserById,
-    updateStudentPartial,
 } from "../service/students.ts";
+import {
+    enqueueCreateStudentOperation,
+    enqueueDeleteStudentOperation,
+    enqueueUpdateStudentOperation,
+} from "../streams/students.ts";
 
 function parseId(value: string | string[] | undefined): string | null {
     if (Array.isArray(value)) {
@@ -79,9 +81,13 @@ export function createStudentHandler(pool: Pool): RequestHandler {
         }
 
         try {
-            const studentId = await insertStudent(pool, id, name, grade, email);
-            const student = await selectUserById(pool, studentId);
-            response.status(201).json(student);
+            const operation = await enqueueCreateStudentOperation({
+                id,
+                name,
+                grade,
+                email,
+            });
+            response.status(202).json(operation);
         } catch (error) {
             console.error(error);
             response.status(500).json({ error: "Internal server error" });
@@ -125,13 +131,13 @@ export function updateStudentHandler(pool: Pool): RequestHandler {
         }
 
         try {
-            const student = await updateStudentPartial(pool, id, updatePayload);
-            if (!student) {
-                response.status(404).json({ error: "Student not found" });
-                return;
-            }
-
-            response.status(200).json(student);
+            const operation = await enqueueUpdateStudentOperation({
+                id,
+                name: updatePayload.name,
+                grade: updatePayload.grade,
+                email: updatePayload.email,
+            });
+            response.status(202).json(operation);
         } catch (error) {
             console.error(error);
             response.status(500).json({ error: "Internal server error" });
@@ -148,13 +154,8 @@ export function deleteStudentHandler(pool: Pool): RequestHandler {
         }
 
         try {
-            const deleted = await deleteStudent(pool, id);
-            if (!deleted) {
-                response.status(404).json({ error: "Student not found" });
-                return;
-            }
-
-            response.status(204).send();
+            const operation = await enqueueDeleteStudentOperation({ id });
+            response.status(202).json(operation);
         } catch (error) {
             console.error(error);
             response.status(500).json({ error: "Internal server error" });

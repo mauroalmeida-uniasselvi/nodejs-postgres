@@ -194,6 +194,7 @@ function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState("create");
   const [editingId, setEditingId] = useState(null);
+  const [queueMessage, setQueueMessage] = useState("");
 
   async function fetchStudents() {
     const response = await fetch("/api/students");
@@ -206,6 +207,22 @@ function App() {
 
   useEffect(() => {
     fetchStudents().catch((error) => console.error(error));
+  }, []);
+
+  useEffect(() => {
+    const eventSource = new EventSource("/api/students/events");
+
+    eventSource.addEventListener("student-updated", () => {
+      fetchStudents().catch((error) => console.error(error));
+    });
+
+    eventSource.onerror = () => {
+      console.error("Conexão SSE interrompida");
+    };
+
+    return () => {
+      eventSource.close();
+    };
   }, []);
 
   function updateField(event) {
@@ -259,8 +276,8 @@ function App() {
         throw new Error(data?.error || "Erro ao criar aluno");
       }
 
+      setQueueMessage(`Solicitação enviada. Operação ${data?.operationId || "-"}.`);
       closeModal();
-      await fetchStudents();
     } catch (error) {
       console.error(error);
     }
@@ -289,8 +306,8 @@ function App() {
         throw new Error(data?.error || "Erro ao atualizar aluno");
       }
 
+      setQueueMessage(`Solicitação enviada. Operação ${data?.operationId || "-"}.`);
       closeModal();
-      await fetchStudents();
     } catch (error) {
       console.error(error);
       return;
@@ -327,7 +344,8 @@ function App() {
         throw new Error(errorMessage);
       }
 
-      await fetchStudents();
+      const data = await response.json();
+      setQueueMessage(`Solicitação enviada. Operação ${data?.operationId || "-"}.`);
     } catch (error) {
       console.error(error);
     }
@@ -365,6 +383,12 @@ function App() {
           </span>
         </button>
       </div>
+
+      {queueMessage && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-700 rounded-lg px-4 py-3 text-sm">
+          {queueMessage}
+        </div>
+      )}
 
       <div className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
