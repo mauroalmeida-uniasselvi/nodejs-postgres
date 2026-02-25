@@ -60,15 +60,7 @@ if ! has_cmd firefox-esr; then
 fi
 FIREFOX_BINARY="$(command -v firefox-esr)"
 
-echo "[2/5] preparando dados do cenário CRUD"
-student_suffix="$(date +%s%N)-$RANDOM"
-student_id="SEL${student_suffix}"
-student_name="Aluno Selenium ${student_suffix}"
-student_grade="T${student_suffix}"
-student_email="selenium.${student_suffix}@example.com"
-updated_name="Aluno Selenium Editado ${student_suffix}"
-updated_grade="E${student_suffix}"
-updated_email="selenium.editado.${student_suffix}@example.com"
+echo "[2/5] validando dependências locais"
 
 if [ -z "$NODE_BIN" ]; then
   echo "Node.js não encontrado no host (node/nodejs)."
@@ -92,13 +84,6 @@ BROWSER_BASE_URL="$BROWSER_BASE_URL" \
 FIREFOX_BINARY="$FIREFOX_BINARY" \
 SELENIUM_HEADLESS="$SELENIUM_HEADLESS" \
 SELENIUM_WAIT_MS="$((WAIT_TIMEOUT_SECONDS * 1000))" \
-STUDENT_ID="$student_id" \
-STUDENT_NAME="$student_name" \
-STUDENT_GRADE="$student_grade" \
-STUDENT_EMAIL="$student_email" \
-UPDATED_NAME="$updated_name" \
-UPDATED_GRADE="$updated_grade" \
-UPDATED_EMAIL="$updated_email" \
 "$NODE_BIN" scripts/crud-webdriver.js
 
 echo "[4/5] cenário finalizado"
