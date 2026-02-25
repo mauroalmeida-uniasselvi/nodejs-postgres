@@ -168,6 +168,18 @@ const emoticons = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 13h5l2 3h4l2-3h5" />
     </svg>
   ),
+  close: (className = "w-5 h-5") => (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      className={className}
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6l-12 12" />
+    </svg>
+  ),
 };
 
 function App() {
@@ -444,8 +456,9 @@ function App() {
                 type="button"
                 onClick={closeModal}
                 className="text-slate-500 hover:text-slate-800 font-medium"
+                aria-label="Fechar"
               >
-                Fechar
+                {emoticons.close()}
               </button>
             </div>
 
