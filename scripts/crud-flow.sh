@@ -7,7 +7,7 @@ API_URL="$BASE_URL/api/students"
 echo "[1/5] POST - criando aluno"
 CREATE_RESPONSE=$(curl -sS -X POST "$API_URL" \
   -H "Content-Type: application/json" \
-  -d '{"first_name":"John","last_name":"Doe","grade":"10","email":"john@example.com"}')
+  -d '{"id":"2026001","name":"John Doe","grade":"10","email":"john@example.com"}')
 
 echo "$CREATE_RESPONSE"
 
@@ -22,10 +22,10 @@ echo "[2/5] GET - buscando aluno $STUDENT_ID"
 curl -sS "$API_URL/$STUDENT_ID"
 echo ""
 
-echo "[3/5] PUT - atualizando first_name para Jane"
+echo "[3/5] PUT - atualizando name para Jane Doe"
 curl -sS -X PUT "$API_URL/$STUDENT_ID" \
   -H "Content-Type: application/json" \
-  -d '{"first_name":"Jane"}'
+  -d '{"name":"Jane Doe"}'
 echo ""
 
 echo "[4/5] GET - buscando aluno atualizado $STUDENT_ID"

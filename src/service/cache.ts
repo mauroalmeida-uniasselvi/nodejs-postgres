@@ -30,7 +30,7 @@ function createRedisUrl(host: string) {
   return `redis://${passwordSection}${host}:${redisPort}`;
 }
 
-export function getStudentCacheKey(id: number): string {
+export function getStudentCacheKey(id: string): string {
   return `${STUDENT_KEY_PREFIX}${id}`;
 }
 

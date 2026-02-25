@@ -17,9 +17,9 @@ const __dirname = path.dirname(__filename);
 const publicDir = path.join(__dirname, "public");
 const port = Number.parseInt(process.env.PORT || "3000", 10);
 
-function parseId(value: string): number | null {
-  const id = Number.parseInt(value, 10);
-  if (Number.isNaN(id) || id <= 0) {
+function parseId(value: string): string | null {
+  const id = value.trim();
+  if (!id) {
     return null;
   }
   return id;
@@ -70,16 +70,16 @@ async function main() {
   });
 
   app.post("/api/students", async (request, response) => {
-    const { first_name, last_name, grade, email } = request.body as {
-      first_name?: unknown;
-      last_name?: unknown;
+    const { id, name, grade, email } = request.body as {
+      id?: unknown;
+      name?: unknown;
       grade?: unknown;
       email?: unknown;
     };
 
     if (
-      typeof first_name !== "string"
-      || typeof last_name !== "string"
+      typeof id !== "string"
+      || typeof name !== "string"
       || typeof grade !== "string"
       || typeof email !== "string"
     ) {
@@ -88,8 +88,8 @@ async function main() {
     }
 
     try {
-      const id = await insertStudent(pool, first_name, last_name, grade, email);
-      const student = await selectUserById(pool, id);
+      const studentId = await insertStudent(pool, id, name, grade, email);
+      const student = await selectUserById(pool, studentId);
       response.status(201).json(student);
     } catch (error) {
       console.error(error);
@@ -105,24 +105,19 @@ async function main() {
     }
 
     const payload = request.body as {
-      first_name?: unknown;
-      last_name?: unknown;
+      name?: unknown;
       grade?: unknown;
       email?: unknown;
     };
 
     const updatePayload: {
-      first_name?: string;
-      last_name?: string;
+      name?: string;
       grade?: string;
       email?: string;
     } = {};
 
-    if (typeof payload.first_name === "string") {
-      updatePayload.first_name = payload.first_name;
-    }
-    if (typeof payload.last_name === "string") {
-      updatePayload.last_name = payload.last_name;
+    if (typeof payload.name === "string") {
+      updatePayload.name = payload.name;
     }
     if (typeof payload.grade === "string") {
       updatePayload.grade = payload.grade;

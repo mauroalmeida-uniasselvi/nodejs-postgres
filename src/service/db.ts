@@ -71,12 +71,154 @@ export async function connectDatabase(): Promise<Pool> {
 export async function ensureStudentsTable(pool: Pool): Promise<void> {
   await executeDbQuery(pool, `
     CREATE TABLE IF NOT EXISTS students (
-      id SERIAL PRIMARY KEY,
-      first_name VARCHAR(100),
-      last_name VARCHAR(100),
+      id VARCHAR(100) PRIMARY KEY,
+      name VARCHAR(200),
       grade VARCHAR(100),
       email VARCHAR(100)
     )
+  `);
+
+  await executeDbQuery(pool, `
+    DO $$
+    DECLARE
+      primary_key_name text;
+      has_id_column boolean;
+      id_is_character_varying boolean;
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'students'
+          AND column_name = 'name'
+      ) THEN
+        ALTER TABLE students ADD COLUMN name VARCHAR(200);
+      END IF;
+
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'students'
+          AND column_name = 'first_name'
+      ) OR EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'students'
+          AND column_name = 'last_name'
+      ) THEN
+        UPDATE students
+        SET name = TRIM(CONCAT_WS(' ', COALESCE(first_name, ''), COALESCE(last_name, '')))
+        WHERE (name IS NULL OR name = '')
+          AND (COALESCE(first_name, '') <> '' OR COALESCE(last_name, '') <> '');
+      END IF;
+
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'students'
+          AND column_name = 'first_name'
+      ) THEN
+        ALTER TABLE students DROP COLUMN first_name;
+      END IF;
+
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'students'
+          AND column_name = 'last_name'
+      ) THEN
+        ALTER TABLE students DROP COLUMN last_name;
+      END IF;
+
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'students'
+          AND column_name = 'id'
+      ) INTO has_id_column;
+
+      IF NOT has_id_column THEN
+        ALTER TABLE students ADD COLUMN id VARCHAR(100);
+      END IF;
+
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'students'
+          AND column_name = 'id'
+          AND data_type = 'character varying'
+      ) INTO id_is_character_varying;
+
+      IF NOT id_is_character_varying THEN
+        ALTER TABLE students
+        ALTER COLUMN id TYPE VARCHAR(100)
+        USING id::text;
+      END IF;
+
+      ALTER TABLE students ALTER COLUMN id DROP DEFAULT;
+
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'students'
+          AND column_name = 'enrollment'
+      ) THEN
+        UPDATE students
+        SET id = enrollment
+        WHERE (id IS NULL OR id = '')
+          AND (enrollment IS NOT NULL AND enrollment <> '');
+      END IF;
+
+      IF has_id_column THEN
+        UPDATE students
+        SET id = id::text
+        WHERE (id IS NULL OR id = '');
+      END IF;
+
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'students'
+          AND column_name = 'matricula'
+      ) THEN
+        UPDATE students
+        SET id = matricula
+        WHERE (id IS NULL OR id = '')
+          AND (matricula IS NOT NULL AND matricula <> '');
+      END IF;
+
+      SELECT conname
+      INTO primary_key_name
+      FROM pg_constraint
+      WHERE conrelid = 'students'::regclass
+        AND contype = 'p'
+      LIMIT 1;
+
+      IF primary_key_name IS NOT NULL THEN
+        EXECUTE format('ALTER TABLE students DROP CONSTRAINT %I', primary_key_name);
+      END IF;
+
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'students'
+          AND column_name = 'enrollment'
+      ) THEN
+        ALTER TABLE students DROP COLUMN enrollment;
+      END IF;
+
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'students'
+          AND column_name = 'matricula'
+      ) THEN
+        ALTER TABLE students DROP COLUMN matricula;
+      END IF;
+
+      ALTER TABLE students ALTER COLUMN id SET NOT NULL;
+      ALTER TABLE students ADD CONSTRAINT students_pkey PRIMARY KEY (id);
+    END
+    $$;
   `);
 
   await executeDbQuery(pool, `

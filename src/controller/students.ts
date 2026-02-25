@@ -10,40 +10,37 @@ import {
 import { executeDbQuery, logDb } from "../service/db.ts";
 
 export interface Student {
-	id: number;
-	first_name: string;
-	last_name: string;
+	id: string;
+	name: string;
 	grade: string;
 	email: string;
 }
 
 interface StudentUpdateInput {
-	first_name?: string;
-	last_name?: string;
+	name?: string;
 	grade?: string;
 	email?: string;
 }
 
 export async function insertStudent(
 	pool: Pool,
-	firstName: string,
-	lastName: string,
+	id: string,
+	name: string,
 	grade: string,
 	email: string
-): Promise<number> {
-	const result = await executeDbQuery<{ id: number }>(
+): Promise<string> {
+	const result = await executeDbQuery<{ id: string }>(
 		pool,
-		"INSERT INTO students (first_name, last_name, grade, email) VALUES ($1, $2, $3, $4) RETURNING id",
-		[firstName, lastName, grade, email]
+		"INSERT INTO students (id, name, grade, email) VALUES ($1, $2, $3, $4) RETURNING id",
+		[id, name, grade, email]
 	);
 
-	const newStudentId = result.rows[0].id as number;
+	const newStudentId = result.rows[0].id as string;
 
 	await invalidateCache([getStudentsListCacheKey()]);
 	await writeCache(getStudentCacheKey(newStudentId), {
 		id: newStudentId,
-		first_name: firstName,
-		last_name: lastName,
+		name,
 		grade,
 		email,
 	});
@@ -51,7 +48,7 @@ export async function insertStudent(
 	return newStudentId;
 }
 
-export async function selectUserById(pool: Pool, id: number): Promise<Student | null> {
+export async function selectUserById(pool: Pool, id: string): Promise<Student | null> {
 	const cacheKey = getStudentCacheKey(id);
 	const cachedStudent = await readCache<Student>(cacheKey);
 	if (cachedStudent) {
@@ -90,16 +87,15 @@ export async function selectAllUsers(pool: Pool): Promise<Student[]> {
 
 export async function updateStudent(
 	pool: Pool,
-	id: number,
-	firstName: string,
-	lastName: string,
+	id: string,
+	name: string,
 	grade: string,
 	email: string
 ): Promise<boolean> {
 	const result = await executeDbQuery(
 		pool,
-		"UPDATE students SET first_name = $1, last_name = $2, grade = $3, email = $4 WHERE id = $5 RETURNING id",
-		[firstName, lastName, grade, email, id]
+		"UPDATE students SET name = $1, grade = $2, email = $3 WHERE id = $4 RETURNING id",
+		[name, grade, email, id]
 	);
 
 	if (!result.rowCount) {
@@ -112,10 +108,10 @@ export async function updateStudent(
 
 export async function updateStudentName(
 	pool: Pool,
-	id: number,
-	firstName: string
+	id: string,
+	name: string
 ): Promise<boolean> {
-	const result = await executeDbQuery(pool, "UPDATE students SET first_name = $1 WHERE id = $2 RETURNING id", [firstName, id]);
+	const result = await executeDbQuery(pool, "UPDATE students SET name = $1 WHERE id = $2 RETURNING id", [name, id]);
 	if (!result.rowCount) {
 		return false;
 	}
@@ -125,7 +121,7 @@ export async function updateStudentName(
 
 export async function updateStudentEmail(
 	pool: Pool,
-	id: number,
+	id: string,
 	email: string
 ): Promise<boolean> {
 	const result = await executeDbQuery(pool, "UPDATE students SET email = $1 WHERE id = $2 RETURNING id", [email, id]);
@@ -138,20 +134,15 @@ export async function updateStudentEmail(
 
 export async function updateStudentPartial(
 	pool: Pool,
-	id: number,
+	id: string,
 	payload: StudentUpdateInput
 ): Promise<Student | null> {
 	const updates: string[] = [];
 	const values: unknown[] = [];
 
-	if (typeof payload.first_name === "string") {
-		values.push(payload.first_name);
-		updates.push(`first_name = $${values.length}`);
-	}
-
-	if (typeof payload.last_name === "string") {
-		values.push(payload.last_name);
-		updates.push(`last_name = $${values.length}`);
+	if (typeof payload.name === "string") {
+		values.push(payload.name);
+		updates.push(`name = $${values.length}`);
 	}
 
 	if (typeof payload.grade === "string") {
@@ -184,7 +175,7 @@ export async function updateStudentPartial(
 	return result.rows[0] ?? null;
 }
 
-export async function deleteStudent(pool: Pool, id: number): Promise<boolean> {
+export async function deleteStudent(pool: Pool, id: string): Promise<boolean> {
 	const result = await executeDbQuery(pool, "DELETE FROM students WHERE id = $1 RETURNING id", [id]);
 	if (!result.rowCount) {
 		return false;
