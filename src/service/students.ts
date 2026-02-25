@@ -6,8 +6,8 @@ import {
 	invalidateCache,
 	readCache,
 	writeCache,
-} from "../service/cache.ts";
-import { executeDbQuery, logDb } from "../service/db.ts";
+} from "../util/cache.ts";
+import { executeDbQuery, logDb } from "../util/database.ts";
 
 export interface Student {
 	id: string;
