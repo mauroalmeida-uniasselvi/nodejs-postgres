@@ -635,7 +635,7 @@ curl -N -i http://localhost:3000/api/students/events
 │                    Express Server (:3000)                             │
 │  ┌─────────────┐      ┌──────────────┐      ┌─────────────────┐       │
 │  │  Frontend   │      │  Controller  │      │  Worker (BRPOP) │       │
-│  │  (Static)   │      │ (students.ts)│      │(streams/*.ts)   │       │
+│  │  (Static)   │      │ (students.ts)│      │ (worker/*.ts)   │       │
 │  └─────────────┘      └──────┬───────┘      └────────┬────────┘       │
 │                              │                       │                │
 │                              ▼                       ▼                │
@@ -689,7 +689,7 @@ Fluxo de Escrita (POST/PUT/DELETE):
 
 1. Cliente envia requisição `POST`, `PUT` ou `DELETE` para `/api/students`
 2. [Controller](src/controller/students.ts) valida payload básico
-3. Operação é serializada e enfileirada no Redis via [streams/students.ts](src/streams/students.ts)
+3. Operação é serializada e enfileirada no Redis via [worker/students.ts](src/worker/students.ts)
 4. Controller retorna imediatamente `202 Accepted` com `operationId`
 5. **Em paralelo** (background):
    - Worker executa `BRPOP` na fila Redis (bloqueante até haver operação)
@@ -712,7 +712,7 @@ Fluxo de Escrita (POST/PUT/DELETE):
 - **[index.ts](index.ts)**: Entry point; configura conexões DB/Redis, inicia worker, registra rotas, gerencia shutdown
 - **[src/controller/students.ts](src/controller/students.ts)**: Controladores Express; validação de entrada, roteamento
 - **[src/service/students.ts](src/service/students.ts)**: Lógica de negócio; operações CRUD no PostgreSQL e cache
-- **[src/streams/students.ts](src/streams/students.ts)**: Gerenciamento de fila Redis e worker assíncrono
+- **[src/worker/students.ts](src/worker/students.ts)**: Gerenciamento de fila Redis e worker assíncrono
 - **[src/util/database.ts](src/util/database.ts)**: Cliente PostgreSQL e query builders
 - **[src/util/cache.ts](src/util/cache.ts)**: Cliente Redis e helper functions de cache
 - **[public/index.html](public/index.html)**: Frontend HTML
@@ -772,7 +772,7 @@ nodejs-postgres/
 │   │   └── students.ts           # Controladores de rotas (Express)
 │   ├── service/
 │   │   └── students.ts           # Lógica de negócio e acesso a dados
-│   ├── streams/
+│   ├── worker/
 │   │   └── students.ts           # Fila Redis e worker assíncrono
 │   └── util/
 │       ├── database.ts           # Cliente e helpers PostgreSQL
@@ -799,7 +799,7 @@ nodejs-postgres/
 - **[index.ts](index.ts)**: Inicializa servidor Express, conecta BD/Redis, inicia worker, registra handlers de shutdown
 - **[src/controller/students.ts](src/controller/students.ts)**: Define rotas REST (`GET`, `POST`, `PUT`, `DELETE`) e SSE
 - **[src/service/students.ts](src/service/students.ts)**: CRUD queries no PostgreSQL, invalidação de cache, lógica de busca
-- **[src/streams/students.ts](src/streams/students.ts)**: Enfileiramento de operações, worker `BRPOP`, retry logic
+- **[src/worker/students.ts](src/worker/students.ts)**: Enfileiramento de operações, worker `BRPOP`, retry logic
 - **[src/util/database.ts](src/util/database.ts)**: Pool de conexões PostgreSQL, helper `ensureStudentsTable()`
 - **[src/util/cache.ts](src/util/cache.ts)**: Cliente Redis, funções `get()`, `set()`, `invalidate()`
 - **[docker-compose.yml](docker-compose.yml)**: Define serviços `api`, `postgres`, `redis` com healthchecks e volumes
@@ -837,12 +837,12 @@ redis-cli -h localhost -p 6379 -a uniasselvi
 
 A aplicação utiliza as seguintes chaves no Redis:
 
-| Chave | Tipo | Descrição | TTL |
-|-------|------|-----------|-----|
-| `queue:students:write` | LIST | Fila de operações de escrita (CREATE/UPDATE/DELETE) | - |
-| `queue:students:operation:{operationId}` | STRING | Status de uma operação específica | 3600s (1 hora) |
-| `student:{id}` | STRING | Cache de um aluno específico | 300s (5 min) |
-| `students:all` | STRING | Cache da lista completa de alunos | 300s (5 min) |
+| Chave                                    | Tipo   | Descrição                                           | TTL            |
+| ---------------------------------------- | ------ | --------------------------------------------------- | -------------- |
+| `queue:students:write`                   | LIST   | Fila de operações de escrita (CREATE/UPDATE/DELETE) | -              |
+| `queue:students:operation:{operationId}` | STRING | Status de uma operação específica                   | 3600s (1 hora) |
+| `student:{id}`                           | STRING | Cache de um aluno específico                        | 300s (5 min)   |
+| `students:all`                           | STRING | Cache da lista completa de alunos                   | 300s (5 min)   |
 
 ---
 
@@ -900,7 +900,8 @@ LPUSH queue:students:write '{
 }'
 ```
 
-⚠️ **Importante**: 
+⚠️ **Importante**:
+
 - O `operationId` deve ser único
 - O campo `type` aceita apenas: `"create"`, `"update"` ou `"delete"`
 - O `payload.id` é obrigatório em todos os tipos
@@ -948,6 +949,7 @@ KEYS queue:students:operation:* | XARGS -I{} redis-cli -a uniasselvi GET {}
 ```
 
 **Exemplo de resposta:**
+
 ```json
 {
   "operationId": "op:manual:1234567890",

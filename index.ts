@@ -14,7 +14,7 @@ import {
   startStudentsQueueWorker,
   stopStudentsQueueWorker,
   subscribeStudentsUpdates,
-} from "./src/streams/students.ts";
+} from "./src/worker/students.ts";
 import { closeRedisConnection, ensureRedisConnection } from "./src/util/cache.ts";
 import { closeDatabase, connectDatabase, ensureStudentsTable } from "./src/util/database.ts";
 

@@ -8,7 +8,7 @@ import {
     enqueueCreateStudentOperation,
     enqueueDeleteStudentOperation,
     enqueueUpdateStudentOperation,
-} from "../streams/students.ts";
+} from "../worker/students.ts";
 
 function parseId(value: string | string[] | undefined): string | null {
     if (Array.isArray(value)) {
