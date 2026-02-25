@@ -3,6 +3,7 @@ import { insertStudent } from "./src/insert.ts";
 import { selectUserById, selectAllUsers } from "./src/select.ts";
 import { updateStudentName } from "./src/update.ts";
 import { deleteStudent } from "./src/delete.ts";
+import { closeRedisConnection, ensureRedisConnection } from "./src/cache.ts";
 
 // Environment variables
 const host = process.env.PG_HOST || "localhost";
@@ -23,6 +24,7 @@ async function main() {
   try {
     await client.connect();
     console.log("Connected to PostgreSQL");
+    await ensureRedisConnection();
 
     // Create table if not exists
     await client.query(`
@@ -57,6 +59,7 @@ async function main() {
   } catch (error) {
     console.error("Error:", error);
   } finally {
+    await closeRedisConnection();
     await client.end();
     console.log("Connection closed");
   }
