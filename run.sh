@@ -12,6 +12,12 @@ while [ "$(docker inspect -f '{{.State.Health.Status}}' nodejs-postgres-postgres
   sleep 1
 done
 
+echo "waiting for redis to be ready"
+while [ "$(docker inspect -f '{{.State.Health.Status}}' nodejs-postgres-redis-1 2>/dev/null)" != "healthy" ]; do
+  echo -n "."
+  sleep 1
+done
+
 echo "building application"
 docker build -t nodejs-postgres .
 
@@ -28,6 +34,11 @@ docker run -it --rm \
   -e PG_USER=uniasselvi \
   -e PG_PASSWORD=uniasselvi \
   -e PG_DATABASE=uniasselvi_db \
+  -e REDIS_HOST=localhost \
+  -e REDIS_PORT=6379 \
+  -e REDIS_PASSWORD=uniasselvi \
+  -e CACHE_DEBUG=true \
+  -e DB_DEBUG=true \
   -v "$(pwd)":/usr/src/app \
   nodejs-postgres
 

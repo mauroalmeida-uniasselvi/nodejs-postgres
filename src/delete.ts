@@ -4,15 +4,16 @@ import {
   getStudentsListCacheKey,
   invalidateByPattern,
   invalidateCache,
-} from "./cache.ts";
+} from "./service/cache.ts";
+import { executeDbQuery } from "./service/db.ts";
 
 export async function deleteStudent(client: Client, id: number): Promise<void> {
-  await client.query("DELETE FROM students WHERE id = $1", [id]);
+  await executeDbQuery(client, "DELETE FROM students WHERE id = $1", [id]);
   await invalidateCache([getStudentCacheKey(id), getStudentsListCacheKey()]);
 }
 
 export async function deleteAllStudent(client: Client): Promise<void> {
-  await client.query("DELETE FROM students");
+  await executeDbQuery(client, "DELETE FROM students");
   await invalidateCache([getStudentsListCacheKey()]);
   await invalidateByPattern("student:*");
 }

@@ -1,5 +1,6 @@
 import { Client } from "pg";
-import { getStudentCacheKey, getStudentsListCacheKey, invalidateCache } from "./cache.ts";
+import { getStudentCacheKey, getStudentsListCacheKey, invalidateCache } from "./service/cache.ts";
+import { executeDbQuery } from "./service/db.ts";
 
 export async function updateStudent(
   client: Client,
@@ -9,7 +10,8 @@ export async function updateStudent(
   grade: number,
   email: string
 ): Promise<void> {
-  await client.query(
+  await executeDbQuery(
+    client,
     "UPDATE students SET first_name = $1, last_name = $2, grade = $3, email = $4 WHERE id = $5",
     [firstName, lastName, grade, email, id]
   );
@@ -22,7 +24,7 @@ export async function updateStudentName(
   id: number,
   firstName: string
 ): Promise<void> {
-  await client.query("UPDATE students SET first_name = $1 WHERE id = $2", [firstName, id]);
+  await executeDbQuery(client, "UPDATE students SET first_name = $1 WHERE id = $2", [firstName, id]);
   await invalidateCache([getStudentCacheKey(id), getStudentsListCacheKey()]);
 }
 
@@ -31,6 +33,6 @@ export async function updateStudentEmail(
   id: number,
   email: string
 ): Promise<void> {
-  await client.query("UPDATE students SET email = $1 WHERE id = $2", [email, id]);
+  await executeDbQuery(client, "UPDATE students SET email = $1 WHERE id = $2", [email, id]);
   await invalidateCache([getStudentCacheKey(id), getStudentsListCacheKey()]);
 }

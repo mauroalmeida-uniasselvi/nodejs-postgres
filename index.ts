@@ -1,41 +1,17 @@
-import { Client } from "pg";
 import { insertStudent } from "./src/insert.ts";
 import { selectUserById, selectAllUsers } from "./src/select.ts";
 import { updateStudentName } from "./src/update.ts";
 import { deleteStudent } from "./src/delete.ts";
-import { closeRedisConnection, ensureRedisConnection } from "./src/cache.ts";
-
-// Environment variables
-const host = process.env.PG_HOST || "localhost";
-const port = parseInt(process.env.PG_PORT || "5432");
-const user = process.env.PG_USER || "uniasselvi";
-const password = process.env.PG_PASSWORD || "uniasselvi";
-const database = process.env.PG_DATABASE || "uniasselvi_db";
+import { closeRedisConnection, ensureRedisConnection } from "./src/service/cache.ts";
+import { closeDatabase, connectDatabase, ensureStudentsTable } from "./src/service/db.ts";
 
 async function main() {
-  const client = new Client({
-    host,
-    port,
-    user,
-    password,
-    database,
-  });
+  const client = await connectDatabase();
 
   try {
-    await client.connect();
-    console.log("Connected to PostgreSQL");
     await ensureRedisConnection();
 
-    // Create table if not exists
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS students (
-        id SERIAL PRIMARY KEY,
-        first_name VARCHAR(100),
-        last_name VARCHAR(100),
-        grade INT,
-        email VARCHAR(100)
-      )
-    `);
+    await ensureStudentsTable(client);
 
     // CREATE: Insert a user
     const userId = await insertStudent(client, "John", "Doe", 10, "john@example.com");
@@ -60,8 +36,7 @@ async function main() {
     console.error("Error:", error);
   } finally {
     await closeRedisConnection();
-    await client.end();
-    console.log("Connection closed");
+    await closeDatabase(client);
   }
 }
 

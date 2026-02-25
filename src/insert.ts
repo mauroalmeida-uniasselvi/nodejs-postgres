@@ -4,7 +4,8 @@ import {
   getStudentsListCacheKey,
   invalidateCache,
   writeCache,
-} from "./cache.ts";
+} from "./service/cache.ts";
+import { executeDbQuery } from "./service/db.ts";
 
 export async function insertStudent(
   client: Client,
@@ -13,7 +14,8 @@ export async function insertStudent(
   grade: number,
   email: string
 ): Promise<number> {
-  const result = await client.query(
+  const result = await executeDbQuery<{ id: number }>(
+    client,
     "INSERT INTO students (first_name, last_name, grade, email) VALUES ($1, $2, $3, $4) RETURNING id",
     [firstName, lastName, grade, email]
   );
