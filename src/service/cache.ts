@@ -1,6 +1,7 @@
+import "dotenv/config";
 import { createClient, type RedisClientType } from "redis";
 
-const redisHost = process.env.REDIS_HOST || "localhost";
+const configuredRedisHost = process.env.REDIS_HOST || "localhost";
 const redisPort = parseInt(process.env.REDIS_PORT || "6379");
 const redisPassword = process.env.REDIS_PASSWORD || "uniasselvi";
 const cacheTtlSeconds = parseInt(process.env.CACHE_TTL_SECONDS || "300");
@@ -19,9 +20,14 @@ function logCache(message: string): void {
   console.log(`[CACHE] ${message}`);
 }
 
-function createRedisUrl() {
+function getRedisHosts(): string[] {
+  const hosts = [configuredRedisHost, "localhost", "redis"];
+  return Array.from(new Set(hosts.filter((hostValue) => hostValue && hostValue.trim().length > 0)));
+}
+
+function createRedisUrl(host: string) {
   const passwordSection = redisPassword ? `:${redisPassword}@` : "";
-  return `redis://${passwordSection}${redisHost}:${redisPort}`;
+  return `redis://${passwordSection}${host}:${redisPort}`;
 }
 
 export function getStudentCacheKey(id: number): string {
@@ -41,25 +47,36 @@ export async function getRedisClient(): Promise<RedisClientType> {
     return redisConnectionPromise;
   }
 
-  redisClient = createClient({
-    url: createRedisUrl(),
-  });
+  redisConnectionPromise = (async () => {
+    const hosts = getRedisHosts();
+    let lastError: unknown = null;
 
-  redisClient.on("error", (error) => {
-    console.error("Redis error:", error.message);
-  });
+    for (const host of hosts) {
+      const candidate = createClient({
+        url: createRedisUrl(host),
+      }) as RedisClientType;
 
-  redisConnectionPromise = redisClient.connect().then(() => {
-    if (!redisClient) {
-      throw new Error("Redis client not initialized");
+      candidate.on("error", (error) => {
+        logCache(`Redis error (${host}): ${error.message}`);
+      });
+
+      try {
+        await candidate.connect();
+        redisClient = candidate;
+        logCache(`Redis connection established (${host})`);
+        return candidate;
+      } catch (error) {
+        lastError = error;
+        await candidate.disconnect().catch(() => undefined);
+      }
     }
-    logCache("Redis connection established");
-    return redisClient;
-  }).finally(() => {
+
+    throw lastError instanceof Error ? lastError : new Error("Unable to connect to Redis");
+  })().finally(() => {
     redisConnectionPromise = null;
   });
 
-  return redisConnectionPromise;
+  return redisConnectionPromise as Promise<RedisClientType>;
 }
 
 export async function ensureRedisConnection(): Promise<void> {
