@@ -624,98 +624,35 @@ curl -N -i http://localhost:3000/api/students/events
 
 ### Diagrama de Componentes e Fluxos
 
-```mermaid
-graph TB
-    Client[Cliente<br/>Browser/curl]
-
-    subgraph Docker["Docker Compose"]
-        subgraph API["Container: api (Node.js)"]
-            Express[Express Server<br/>:3000]
-            Controller[Controller<br/>students.ts]
-            Service[Service<br/>students.ts]
-            Worker[Worker Assíncrono<br/>streams/students.ts]
-            Frontend[Frontend Static<br/>React + Babel]
-        end
-
-        subgraph Cache["Container: redis"]
-            Redis[(Redis<br/>:6379)]
-            Queue[Fila de Operações<br/>queue:students]
-            CacheData[Cache de Leitura<br/>students:*]
-        end
-
-        subgraph DB["Container: postgres"]
-            Postgres[(PostgreSQL<br/>:5432)]
-            StudentsTable[Tabela: students<br/>id, name, grade, email]
-        end
-    end
-
-    Client -->|HTTP Request| Express
-    Express -->|Serve HTML| Frontend
-    Frontend -->|API Calls| Express
-
-    Express -->|Routes| Controller
-
-    Controller -->|GET /api/students| Service
-    Service -->|1. Check Cache| CacheData
-    CacheData -->|Hit| Service
-    Service -->|2. Cache Miss| StudentsTable
-    StudentsTable -->|Data| Service
-    Service -->|3. Update Cache| CacheData
-    Service -->|Response| Controller
-    Controller -->|JSON| Client
-
-    Controller -->|POST/PUT/DELETE| Queue
-    Queue -->|202 Accepted| Client
-
-    Worker -->|BRPOP| Queue
-    Queue -->|Operation| Worker
-    Worker -->|Write/Update/Delete| Service
-    Service -->|SQL| StudentsTable
-    Service -->|Invalidate Cache| CacheData
-    Worker -->|Emit Event| Express
-    Express -->|SSE: student-updated| Frontend
-
-    style Client fill:#e1f5ff
-    style Express fill:#ffd7b5
-    style Controller fill:#fff4b5
-    style Service fill:#ffe4b5
-    style Worker fill:#ffb5d5
-    style Redis fill:#ffe0e0
-    style Postgres fill:#d5e8ff
-    style Frontend fill:#e5ffe5
 ```
-
-### Diagrama ASCII (Alternativo)
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────────────────────────┐
 │                         Cliente (Browser/curl)                       │
-└────────────┬─────────────────────────────────────┬──────────────────┘
+└────────────┬─────────────────────────────────────┬───────────────────┘
              │                                     │
              │ HTTP Request                        │ SSE Events
              ▼                                     ▼
-┌──────────────────────────────────────────────────────────────────────┐
+┌───────────────────────────────────────────────────────────────────────┐
 │                    Express Server (:3000)                             │
-│  ┌─────────────┐      ┌──────────────┐      ┌─────────────────┐     │
-│  │  Frontend   │      │  Controller  │      │  Worker (BRPOP) │     │
-│  │  (Static)   │      │ (students.ts)│      │(streams/*.ts)   │     │
-│  └─────────────┘      └──────┬───────┘      └────────┬────────┘     │
-│                              │                       │               │
-│                              ▼                       ▼               │
-│                       ┌─────────────┐         ┌─────────────┐       │
-│                       │   Service   │◄────────│  Enqueue/   │       │
-│                       │(students.ts)│         │  Dequeue    │       │
-│                       └──────┬──────┘         └─────────────┘       │
-└──────────────────────────────┼───────────────────────────────────────┘
+│  ┌─────────────┐      ┌──────────────┐      ┌─────────────────┐       │
+│  │  Frontend   │      │  Controller  │      │  Worker (BRPOP) │       │
+│  │  (Static)   │      │ (students.ts)│      │(streams/*.ts)   │       │
+│  └─────────────┘      └──────┬───────┘      └────────┬────────┘       │
+│                              │                       │                │
+│                              ▼                       ▼                │
+│                       ┌─────────────┐         ┌─────────────┐         │
+│                       │   Service   │◄────────│  Enqueue/   │         │
+│                       │(students.ts)│         │  Dequeue    │         │
+│                       └──────┬──────┘         └─────────────┘         │
+└──────────────────────────────┼────────────────────────────────────────┘
                                │
-                ┌──────────────┼──────────────┐
-                │              │              │
-                ▼              ▼              ▼
-        ┌────────────┐  ┌────────────┐  ┌────────────┐
-        │ PostgreSQL │  │   Redis    │  │   Redis    │
-        │   :5432    │  │   Cache    │  │   Queue    │
-        │  (Persist) │  │ (students:)│  │(queue:students)│
-        └────────────┘  └────────────┘  └────────────┘
+                ┌──────────────┼─────────────────┐
+                │              │                 │
+                ▼              ▼                 ▼
+        ┌────────────┐  ┌────────────┐  ┌──────────────────┐
+        │ PostgreSQL │  │   Redis    │  │      Redis       │
+        │  Database  │  │   Cache    │  │      Queue       │
+        │  (Persist) │  │ (students:)│  │ (queue:students) │
+        └────────────┘  └────────────┘  └──────────────────┘
 
 Fluxo de Leitura (GET):
   1. Controller → Service → Cache (Redis)
