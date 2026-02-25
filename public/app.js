@@ -352,8 +352,8 @@ function App() {
   }
 
   return (
-    <div className="space-y-6 py-8">
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div id="students-app" className="space-y-6 py-8">
+      <div id="students-header" className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-2">
             {emoticons.book()}
@@ -362,6 +362,7 @@ function App() {
           <p className="text-slate-600 mt-1">Crie, edite e remova registros de estudantes.</p>
         </div>
         <button
+          id="btn-open-create-student-modal"
           onClick={openCreateModal}
           className="bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-4 py-2.5 transition"
         >
@@ -374,6 +375,7 @@ function App() {
 
       <div className="flex justify-end">
         <button
+          id="btn-refresh-students"
           onClick={() => fetchStudents().catch((error) => console.error(error))}
           className="bg-slate-800 hover:bg-slate-900 text-white font-medium rounded-lg px-4 py-2.5 transition"
         >
@@ -385,14 +387,14 @@ function App() {
       </div>
 
       {queueMessage && (
-        <div className="bg-blue-50 border border-blue-200 text-blue-700 rounded-lg px-4 py-3 text-sm">
+        <div id="students-queue-message" className="bg-blue-50 border border-blue-200 text-blue-700 rounded-lg px-4 py-3 text-sm">
           {queueMessage}
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
+      <div id="students-table-container" className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+          <table id="students-table" className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-700">
               <tr>
                 <th className="py-3 px-4 font-semibold">
@@ -427,16 +429,17 @@ function App() {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 text-slate-800">
+            <tbody id="students-table-body" className="divide-y divide-slate-200 text-slate-800">
               {students.map((student) => (
-                <tr key={student.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="py-3 px-4">{student.id}</td>
-                  <td className="py-3 px-4">{student.name}</td>
-                  <td className="py-3 px-4">{student.grade}</td>
-                  <td className="py-3 px-4">{student.email}</td>
+                <tr id={`student-row-${student.id}`} key={student.id} className="hover:bg-slate-50 transition-colors">
+                  <td id={`student-id-${student.id}`} className="py-3 px-4">{student.id}</td>
+                  <td id={`student-name-${student.id}`} className="py-3 px-4">{student.name}</td>
+                  <td id={`student-grade-${student.id}`} className="py-3 px-4">{student.grade}</td>
+                  <td id={`student-email-${student.id}`} className="py-3 px-4">{student.email}</td>
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
                       <button
+                        id={`btn-edit-student-${student.id}`}
                         onClick={() => openEditModal(student)}
                         className="bg-amber-500 hover:bg-amber-600 text-white rounded-lg px-3 py-1.5 text-sm font-medium transition"
                       >
@@ -446,6 +449,7 @@ function App() {
                         </span>
                       </button>
                       <button
+                        id={`btn-delete-student-${student.id}`}
                         onClick={() => removeStudent(student.id)}
                         className="bg-red-600 hover:bg-red-700 text-white rounded-lg px-3 py-1.5 text-sm font-medium transition"
                       >
@@ -462,7 +466,7 @@ function App() {
           </table>
         </div>
         {students.length === 0 && (
-          <div className="px-4 py-8 text-center text-slate-500 flex items-center justify-center gap-2">
+          <div id="students-empty-state" className="px-4 py-8 text-center text-slate-500 flex items-center justify-center gap-2">
             {emoticons.inbox()}
             <span>Nenhum estudante cadastrado.</span>
           </div>
@@ -470,13 +474,14 @@ function App() {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-5 w-full max-w-xl space-y-4">
+        <div id="student-modal-overlay" className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div id="student-modal" className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-5 w-full max-w-xl space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-slate-900">
+              <h2 id="student-modal-title" className="text-xl font-semibold text-slate-900">
                 {modalMode === "create" ? "Cadastrar estudante" : `Editar estudante #${editingId}`}
               </h2>
               <button
+                id="btn-close-student-modal"
                 type="button"
                 onClick={closeModal}
                 className="text-slate-500 hover:text-slate-800 font-medium"
@@ -486,10 +491,11 @@ function App() {
               </button>
             </div>
 
-            <form onSubmit={submitModal} className="grid gap-4 md:grid-cols-2">
-              <label className="space-y-1 block">
+            <form id="student-form" onSubmit={submitModal} className="grid gap-4 md:grid-cols-2">
+              <label htmlFor="input-student-id" className="space-y-1 block">
                 <span className="text-sm font-medium text-slate-700">Matrícula</span>
                 <input
+                  id="input-student-id"
                   name="id"
                   value={form.id}
                   onChange={updateField}
@@ -498,9 +504,10 @@ function App() {
                   className="w-full border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-lg px-3 py-2 outline-none"
                 />
               </label>
-              <label className="space-y-1 block">
+              <label htmlFor="input-student-name" className="space-y-1 block">
                 <span className="text-sm font-medium text-slate-700">Nome</span>
                 <input
+                  id="input-student-name"
                   name="name"
                   value={form.name}
                   onChange={updateField}
@@ -508,9 +515,10 @@ function App() {
                   className="w-full border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-lg px-3 py-2 outline-none"
                 />
               </label>
-              <label className="space-y-1 block">
+              <label htmlFor="input-student-grade" className="space-y-1 block">
                 <span className="text-sm font-medium text-slate-700">Turma</span>
                 <input
+                  id="input-student-grade"
                   name="grade"
                   type="text"
                   value={form.grade}
@@ -519,9 +527,10 @@ function App() {
                   className="w-full border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-lg px-3 py-2 outline-none"
                 />
               </label>
-              <label className="space-y-1 block">
+              <label htmlFor="input-student-email" className="space-y-1 block">
                 <span className="text-sm font-medium text-slate-700">Email</span>
                 <input
+                  id="input-student-email"
                   name="email"
                   type="email"
                   value={form.email}
@@ -531,6 +540,7 @@ function App() {
                 />
               </label>
               <button
+                id="btn-submit-student-form"
                 type="submit"
                 className={`md:col-span-2 text-white font-medium rounded-lg px-4 py-2.5 transition ${modalMode === "create" ? "bg-blue-600 hover:bg-blue-700" : "bg-amber-500 hover:bg-amber-600"}`}
               >
