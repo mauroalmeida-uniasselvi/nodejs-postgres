@@ -194,6 +194,7 @@ function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState("create");
   const [editingId, setEditingId] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [queueMessage, setQueueMessage] = useState("");
 
   async function fetchStudents() {
@@ -253,6 +254,20 @@ function App() {
       email: student.email || "",
     });
     setIsModalOpen(true);
+  }
+
+  function openDeleteModal(student) {
+    if (!student?.id) {
+      return;
+    }
+    setDeleteTarget({
+      id: student.id,
+      name: student.name || "",
+    });
+  }
+
+  function closeDeleteModal() {
+    setDeleteTarget(null);
   }
 
   async function createStudent(event) {
@@ -349,6 +364,15 @@ function App() {
     } catch (error) {
       console.error(error);
     }
+  }
+
+  async function confirmDeleteStudent() {
+    if (!deleteTarget?.id) {
+      return;
+    }
+
+    await removeStudent(deleteTarget.id);
+    closeDeleteModal();
   }
 
   return (
@@ -450,7 +474,7 @@ function App() {
                       </button>
                       <button
                         id={`btn-delete-student-${student.id}`}
-                        onClick={() => removeStudent(student.id)}
+                        onClick={() => openDeleteModal(student)}
                         className="bg-red-600 hover:bg-red-700 text-white rounded-lg px-3 py-1.5 text-sm font-medium transition"
                       >
                         <span className="inline-flex items-center gap-1.5">
@@ -550,6 +574,37 @@ function App() {
                 </span>
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div id="delete-student-modal-overlay" className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div id="delete-student-modal" className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-5 w-full max-w-md space-y-4">
+            <div className="space-y-1">
+              <h2 id="delete-student-modal-title" className="text-xl font-semibold text-slate-900">Confirmar exclusão</h2>
+              <p id="delete-student-modal-message" className="text-slate-600 text-sm">
+                Deseja realmente excluir {deleteTarget.name ? <strong>{deleteTarget.name}</strong> : "este estudante"}?
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                id="btn-cancel-delete-student"
+                type="button"
+                onClick={closeDeleteModal}
+                className="bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg px-4 py-2 text-sm font-medium transition"
+              >
+                Cancelar
+              </button>
+              <button
+                id="btn-confirm-delete-student"
+                type="button"
+                onClick={confirmDeleteStudent}
+                className="bg-red-600 hover:bg-red-700 text-white rounded-lg px-4 py-2 text-sm font-medium transition"
+              >
+                Confirmar
+              </button>
+            </div>
           </div>
         </div>
       )}
