@@ -16,7 +16,9 @@
   "main": "index.js",
   "scripts": {
     "start": "node --experimental-strip-types index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --experimental-strip-types --experimental-test-coverage --test-coverage-lines=80 --test index.test.ts src/**/*.test.ts",
+    "test:watch": "node --watch --experimental-strip-types --test index.test.ts src/**/*.test.ts",
+    "test:coverage": "node --experimental-strip-types --experimental-test-coverage --test index.test.ts src/**/*.test.ts"
   },
   "dependencies": {
     "dotenv": "^17.3.1",

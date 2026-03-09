@@ -22,6 +22,40 @@ interface StudentUpdateInput {
 	email?: string;
 }
 
+interface StudentsServiceDependencies {
+	getStudentCacheKey: typeof getStudentCacheKey;
+	getStudentsListCacheKey: typeof getStudentsListCacheKey;
+	invalidateByPattern: typeof invalidateByPattern;
+	invalidateCache: typeof invalidateCache;
+	readCache: typeof readCache;
+	writeCache: typeof writeCache;
+	executeDbQuery: typeof executeDbQuery;
+	logDb: typeof logDb;
+}
+
+const defaultDependencies: StudentsServiceDependencies = {
+	getStudentCacheKey,
+	getStudentsListCacheKey,
+	invalidateByPattern,
+	invalidateCache,
+	readCache,
+	writeCache,
+	executeDbQuery,
+	logDb,
+};
+
+const dependencies: StudentsServiceDependencies = { ...defaultDependencies };
+
+export function __setStudentsServiceDependenciesForTests(
+	overrides: Partial<StudentsServiceDependencies>
+): void {
+	Object.assign(dependencies, overrides);
+}
+
+export function __resetStudentsServiceDependenciesForTests(): void {
+	Object.assign(dependencies, defaultDependencies);
+}
+
 function isCacheDebugEnabled(): boolean {
 	return (process.env.CACHE_DEBUG || "false").toLowerCase() === "true";
 }
@@ -33,7 +67,10 @@ function logCache(message: string): void {
 }
 
 async function invalidateStudentCache(id: string): Promise<void> {
-	await invalidateCache([getStudentCacheKey(id), getStudentsListCacheKey()]);
+	await dependencies.invalidateCache([
+		dependencies.getStudentCacheKey(id),
+		dependencies.getStudentsListCacheKey(),
+	]);
 }
 
 export async function insertStudent(
@@ -43,7 +80,7 @@ export async function insertStudent(
 	grade: string,
 	email: string
 ): Promise<string> {
-	const result = await executeDbQuery<{ id: string }>(
+	const result = await dependencies.executeDbQuery<{ id: string }>(
 		pool,
 		"INSERT INTO students (id, name, grade, email) VALUES ($1, $2, $3, $4) RETURNING id",
 		[id, name, grade, email]
@@ -51,8 +88,8 @@ export async function insertStudent(
 
 	const newStudentId = result.rows[0].id as string;
 
-	await invalidateCache([getStudentsListCacheKey()]);
-	await writeCache(getStudentCacheKey(newStudentId), {
+	await dependencies.invalidateCache([dependencies.getStudentsListCacheKey()]);
+	await dependencies.writeCache(dependencies.getStudentCacheKey(newStudentId), {
 		id: newStudentId,
 		name,
 		grade,
@@ -63,35 +100,35 @@ export async function insertStudent(
 }
 
 export async function selectUserById(pool: Pool, id: string): Promise<Student | null> {
-	const cacheKey = getStudentCacheKey(id);
-	const cachedStudent = await readCache<Student>(cacheKey);
+	const cacheKey = dependencies.getStudentCacheKey(id);
+	const cachedStudent = await dependencies.readCache<Student>(cacheKey);
 	if (cachedStudent) {
 		logCache(`[CACHE][selectUserById] source=redis id=${id}`);
 		return cachedStudent;
 	}
 
-	logDb(`selectUserById source=postgres id=${id}`);
-	const result = await executeDbQuery<Student>(pool, "SELECT * FROM students WHERE id = $1", [id]);
+	dependencies.logDb(`selectUserById source=postgres id=${id}`);
+	const result = await dependencies.executeDbQuery<Student>(pool, "SELECT * FROM students WHERE id = $1", [id]);
 	const student = result.rows[0] || null;
 
 	if (student) {
-		await writeCache(cacheKey, student);
+		await dependencies.writeCache(cacheKey, student);
 	}
 
 	return student;
 }
 
 export async function selectAllUsers(pool: Pool): Promise<Student[]> {
-	const cacheKey = getStudentsListCacheKey();
-	const cachedStudents = await readCache<Student[]>(cacheKey);
+	const cacheKey = dependencies.getStudentsListCacheKey();
+	const cachedStudents = await dependencies.readCache<Student[]>(cacheKey);
 	if (cachedStudents) {
 		logCache("[CACHE][selectAllUsers] source=redis");
 		return cachedStudents;
 	}
 
-	logDb("selectAllUsers source=postgres");
-	const result = await executeDbQuery<Student>(pool, "SELECT * FROM students");
-	await writeCache(cacheKey, result.rows);
+	dependencies.logDb("selectAllUsers source=postgres");
+	const result = await dependencies.executeDbQuery<Student>(pool, "SELECT * FROM students");
+	await dependencies.writeCache(cacheKey, result.rows);
 	return result.rows;
 }
 
@@ -102,7 +139,7 @@ export async function updateStudent(
 	grade: string,
 	email: string
 ): Promise<boolean> {
-	const result = await executeDbQuery(
+	const result = await dependencies.executeDbQuery(
 		pool,
 		"UPDATE students SET name = $1, grade = $2, email = $3 WHERE id = $4 RETURNING id",
 		[name, grade, email, id]
@@ -121,7 +158,7 @@ export async function updateStudentName(
 	id: string,
 	name: string
 ): Promise<boolean> {
-	const result = await executeDbQuery(pool, "UPDATE students SET name = $1 WHERE id = $2 RETURNING id", [name, id]);
+	const result = await dependencies.executeDbQuery(pool, "UPDATE students SET name = $1 WHERE id = $2 RETURNING id", [name, id]);
 	if (!result.rowCount) {
 		return false;
 	}
@@ -134,7 +171,7 @@ export async function updateStudentEmail(
 	id: string,
 	email: string
 ): Promise<boolean> {
-	const result = await executeDbQuery(pool, "UPDATE students SET email = $1 WHERE id = $2 RETURNING id", [email, id]);
+	const result = await dependencies.executeDbQuery(pool, "UPDATE students SET email = $1 WHERE id = $2 RETURNING id", [email, id]);
 	if (!result.rowCount) {
 		return false;
 	}
@@ -171,7 +208,7 @@ export async function updateStudentPartial(
 
 	values.push(id);
 
-	const result = await executeDbQuery<Student>(
+	const result = await dependencies.executeDbQuery<Student>(
 		pool,
 		`UPDATE students SET ${updates.join(", ")} WHERE id = $${values.length} RETURNING *`,
 		values
@@ -186,7 +223,7 @@ export async function updateStudentPartial(
 }
 
 export async function deleteStudent(pool: Pool, id: string): Promise<boolean> {
-	const result = await executeDbQuery(pool, "DELETE FROM students WHERE id = $1 RETURNING id", [id]);
+	const result = await dependencies.executeDbQuery(pool, "DELETE FROM students WHERE id = $1 RETURNING id", [id]);
 	if (!result.rowCount) {
 		return false;
 	}
@@ -195,7 +232,7 @@ export async function deleteStudent(pool: Pool, id: string): Promise<boolean> {
 }
 
 export async function deleteAllStudent(pool: Pool): Promise<void> {
-	await executeDbQuery(pool, "DELETE FROM students");
-	await invalidateCache([getStudentsListCacheKey()]);
-	await invalidateByPattern("student:*");
+	await dependencies.executeDbQuery(pool, "DELETE FROM students");
+	await dependencies.invalidateCache([dependencies.getStudentsListCacheKey()]);
+	await dependencies.invalidateByPattern("student:*");
 }

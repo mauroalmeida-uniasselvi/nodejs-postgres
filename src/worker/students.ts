@@ -66,12 +66,46 @@ class NonRetryableQueueError extends Error {
 
 const events = new EventEmitter();
 
+interface StudentsWorkerDependencies {
+	randomUUID: () => string;
+	nowIso: () => string;
+	getRedisClient: typeof getRedisClient;
+	insertStudent: typeof insertStudent;
+	updateStudentPartial: typeof updateStudentPartial;
+	deleteStudent: typeof deleteStudent;
+}
+
+const defaultDependencies: StudentsWorkerDependencies = {
+	randomUUID,
+	nowIso: () => new Date().toISOString(),
+	getRedisClient,
+	insertStudent,
+	updateStudentPartial,
+	deleteStudent,
+};
+
+const dependencies: StudentsWorkerDependencies = { ...defaultDependencies };
+
+export function __setStudentsWorkerDependenciesForTests(
+	overrides: Partial<StudentsWorkerDependencies>
+): void {
+	Object.assign(dependencies, overrides);
+}
+
+export function __resetStudentsWorkerDependenciesForTests(): void {
+	Object.assign(dependencies, defaultDependencies);
+}
+
+export function __resetStudentsWorkerStateForTests(): void {
+	workerRunning = false;
+	workerLoop = null;
+	for (const listener of events.listeners("student-updated")) {
+		events.off("student-updated", listener);
+	}
+}
+
 let workerRunning = false;
 let workerLoop: Promise<void> | null = null;
-
-function nowIso(): string {
-	return new Date().toISOString();
-}
 
 function getOperationStatusKey(operationId: string): string {
 	return `${OPERATION_STATUS_PREFIX}${operationId}`;
@@ -82,7 +116,7 @@ function getStudentId(payload: StudentOperationPayload): string {
 }
 
 async function saveOperationStatus(status: OperationStatus): Promise<void> {
-	const redis = await getRedisClient();
+	const redis = await dependencies.getRedisClient();
 	await redis.set(getOperationStatusKey(status.operationId), JSON.stringify(status), {
 		EX: OPERATION_STATUS_TTL_SECONDS,
 	});
@@ -95,7 +129,7 @@ function buildQueuedStatus(operationId: string, type: OperationType, studentId: 
 		studentId,
 		status: "queued",
 		attempts: 0,
-		updatedAt: nowIso(),
+		updatedAt: dependencies.nowIso(),
 	};
 }
 
@@ -103,19 +137,19 @@ async function enqueueOperation(
 	type: OperationType,
 	payload: StudentOperationPayload
 ): Promise<OperationStatus> {
-	const operationId = randomUUID();
+	const operationId = dependencies.randomUUID();
 	const message: QueueMessage = {
 		operationId,
 		type,
 		payload,
 		attempts: 0,
-		queuedAt: nowIso(),
+		queuedAt: dependencies.nowIso(),
 	};
 
 	const status = buildQueuedStatus(operationId, type, getStudentId(payload));
 	await saveOperationStatus(status);
 
-	const redis = await getRedisClient();
+	const redis = await dependencies.getRedisClient();
 	await redis.lPush(STUDENTS_QUEUE_KEY, JSON.stringify(message));
 
 	return status;
@@ -176,19 +210,19 @@ async function processQueueMessage(pool: Pool, message: QueueMessage): Promise<v
 		studentId,
 		status: "processing",
 		attempts: attemptNumber,
-		updatedAt: nowIso(),
+		updatedAt: dependencies.nowIso(),
 	});
 
 	try {
 		switch (message.type) {
 			case "create": {
 				const payload = message.payload as StudentCreatePayload;
-				await insertStudent(pool, payload.id, payload.name, payload.grade, payload.email);
+				await dependencies.insertStudent(pool, payload.id, payload.name, payload.grade, payload.email);
 				break;
 			}
 			case "update": {
 				const payload = message.payload as StudentUpdatePayload;
-				const updatedStudent = await updateStudentPartial(pool, payload.id, {
+				const updatedStudent = await dependencies.updateStudentPartial(pool, payload.id, {
 					name: payload.name,
 					grade: payload.grade,
 					email: payload.email,
@@ -200,7 +234,7 @@ async function processQueueMessage(pool: Pool, message: QueueMessage): Promise<v
 			}
 			case "delete": {
 				const payload = message.payload as StudentDeletePayload;
-				const deleted = await deleteStudent(pool, payload.id);
+				const deleted = await dependencies.deleteStudent(pool, payload.id);
 				if (!deleted) {
 					throw new NonRetryableQueueError("Student not found");
 				}
@@ -216,7 +250,7 @@ async function processQueueMessage(pool: Pool, message: QueueMessage): Promise<v
 			studentId,
 			status: "processed",
 			attempts: attemptNumber,
-			updatedAt: nowIso(),
+			updatedAt: dependencies.nowIso(),
 		});
 
 		events.emit("student-updated", {
@@ -233,11 +267,11 @@ async function processQueueMessage(pool: Pool, message: QueueMessage): Promise<v
 				studentId,
 				status: "queued",
 				attempts: attemptNumber,
-				updatedAt: nowIso(),
+				updatedAt: dependencies.nowIso(),
 				error: toErrorMessage(error),
 			});
 
-			const redis = await getRedisClient();
+			const redis = await dependencies.getRedisClient();
 			const retryMessage: QueueMessage = {
 				...message,
 				attempts: attemptNumber,
@@ -252,14 +286,19 @@ async function processQueueMessage(pool: Pool, message: QueueMessage): Promise<v
 			studentId,
 			status: "failed",
 			attempts: attemptNumber,
-			updatedAt: nowIso(),
+			updatedAt: dependencies.nowIso(),
 			error: toErrorMessage(error),
 		});
 	}
 }
 
+export const __internalWorkerForTests = {
+	parseQueueMessage,
+	processQueueMessage,
+};
+
 async function runWorker(pool: Pool): Promise<void> {
-	const baseRedis = await getRedisClient();
+	const baseRedis = await dependencies.getRedisClient();
 	const redisWorker = baseRedis.duplicate();
 	await redisWorker.connect();
 

@@ -26,19 +26,34 @@ export function logDb(message: string): void {
 }
 
 let dbPool: Pool | null = null;
+let createDbPoolForHostImpl = (host: string): Pool => new Pool({
+  host,
+  port,
+  user,
+  password,
+  database,
+});
+
+export function __setDbPoolForTests(pool: Pool | null): void {
+  dbPool = pool;
+}
+
+export function __setCreateDbPoolForHostForTests(factory: ((host: string) => Pool) | null): void {
+  createDbPoolForHostImpl = factory ?? ((host: string) => new Pool({
+    host,
+    port,
+    user,
+    password,
+    database,
+  }));
+}
 
 export function createDbPool(): Pool {
   return createDbPoolForHost(configuredHost);
 }
 
 function createDbPoolForHost(host: string): Pool {
-  return new Pool({
-    host,
-    port,
-    user,
-    password,
-    database,
-  });
+  return createDbPoolForHostImpl(host);
 }
 
 export async function connectDatabase(): Promise<Pool> {

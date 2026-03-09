@@ -9,6 +9,24 @@ const cacheDebugEnabled = (process.env.CACHE_DEBUG || "false").toLowerCase() ===
 
 let redisClient: RedisClientType | null = null;
 let redisConnectionPromise: Promise<RedisClientType> | null = null;
+let createRedisClientImpl = createClient;
+
+export function __setRedisClientForTests(client: RedisClientType | null): void {
+  redisClient = client;
+  redisConnectionPromise = null;
+}
+
+export function __setCreateRedisClientForTests(
+  factory: typeof createClient | null
+): void {
+  createRedisClientImpl = factory ?? createClient;
+}
+
+export function __resetCacheStateForTests(): void {
+  redisClient = null;
+  redisConnectionPromise = null;
+  createRedisClientImpl = createClient;
+}
 
 const STUDENT_KEY_PREFIX = "student:";
 const STUDENTS_LIST_KEY = "students:all";
@@ -52,7 +70,7 @@ export async function getRedisClient(): Promise<RedisClientType> {
     let lastError: unknown = null;
 
     for (const host of hosts) {
-      const candidate = createClient({
+      const candidate = createRedisClientImpl({
         url: createRedisUrl(host),
       }) as RedisClientType;
 

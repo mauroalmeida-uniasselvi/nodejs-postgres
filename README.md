@@ -7,6 +7,7 @@ Sistema de CRUD assíncrono para gerenciamento de estudantes, construído com No
 - [Visão Geral](#visão-geral)
 - [Como Executar a Aplicação](#como-executar-a-aplicação)
 - [Como Parar a Aplicação](#como-parar-a-aplicação)
+- [Testes Unitários](#-testes-unitários)
 - [Scripts de CRUD](#scripts-de-crud)
 - [Endpoints da API](#endpoints-da-api)
 - [Arquitetura](#arquitetura)
@@ -143,6 +144,30 @@ docker compose stop
 # Retomar depois
 docker compose start
 ```
+
+## 🧪 Testes Unitários
+
+O projeto usa testes nativos do Node.js com TypeScript (`node:test` + `node:assert`) e cobertura nativa do runtime.
+
+### Executar testes com cobertura mínima (80% em linhas)
+
+```bash
+npm test
+```
+
+### Executar testes em modo watch
+
+```bash
+npm run test:watch
+```
+
+### Executar testes com relatório de cobertura (sem bloquear por threshold)
+
+```bash
+npm run test:coverage
+```
+
+Arquivos de teste seguem o padrão `*.test.ts` cobrindo todos os módulos `.ts` principais do projeto.
 
 ## 📝 Scripts de CRUD
 
