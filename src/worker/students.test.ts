@@ -15,19 +15,6 @@ function createRedisMock() {
   const statuses = new Map<string, string>();
   const queue: string[] = [];
 
-  const redisWorker = {
-    isOpen: true,
-    connect: async () => undefined,
-    quit: async () => undefined,
-    brPop: async () => {
-      const element = queue.pop();
-      if (!element) {
-        return null;
-      }
-      return { key: "queue:students:write", element };
-    },
-  };
-
   const redis = {
     statuses,
     queue,
@@ -39,10 +26,9 @@ function createRedisMock() {
       queue.unshift(value);
       return queue.length;
     },
-    duplicate: () => redisWorker,
   };
 
-  return { redis, redisWorker };
+  return { redis };
 }
 
 test.beforeEach(() => {

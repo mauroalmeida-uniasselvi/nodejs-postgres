@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
-  __resetStudentsServiceDependenciesForTests,
-  __setStudentsServiceDependenciesForTests,
+import * as studentsService from "./students.ts";
+
+const {
   deleteAllStudent,
   deleteStudent,
   insertStudent,
@@ -12,18 +12,22 @@ import {
   updateStudentName,
   updateStudent,
   updateStudentPartial,
-} from "./students.ts";
+} = studentsService;
 
 const pool = {} as never;
 
+function setDeps(overrides: Parameters<typeof studentsService.__setStudentsServiceDependenciesForTests>[0]) {
+  studentsService.__setStudentsServiceDependenciesForTests(overrides);
+}
+
 test.beforeEach(() => {
-  __resetStudentsServiceDependenciesForTests();
+  studentsService.__resetStudentsServiceDependenciesForTests();
 });
 
 test("insertStudent writes DB and refreshes cache", async () => {
   const calls: string[] = [];
 
-  __setStudentsServiceDependenciesForTests({
+  setDeps({
     executeDbQuery: (async () => ({ rows: [{ id: "s1" }], rowCount: 1 })) as never,
     getStudentsListCacheKey: (() => "students:all") as never,
     getStudentCacheKey: ((id: string) => `student:${id}`) as never,
@@ -44,7 +48,7 @@ test("insertStudent writes DB and refreshes cache", async () => {
 test("selectUserById returns cached student when available", async () => {
   let queriedDb = false;
 
-  __setStudentsServiceDependenciesForTests({
+  setDeps({
     getStudentCacheKey: ((id: string) => `student:${id}`) as never,
     readCache: (async () => ({ id: "s2", name: "Joao", grade: "B", email: "j@test.com" })) as never,
     executeDbQuery: (async () => {
@@ -63,7 +67,7 @@ test("selectUserById returns cached student when available", async () => {
 test("selectUserById queries DB and caches when cache miss", async () => {
   let cacheWrites = 0;
 
-  __setStudentsServiceDependenciesForTests({
+  setDeps({
     getStudentCacheKey: ((id: string) => `student:${id}`) as never,
     readCache: (async () => null) as never,
     executeDbQuery: (async () => ({
@@ -82,7 +86,7 @@ test("selectUserById queries DB and caches when cache miss", async () => {
 });
 
 test("updateStudent returns false when row is missing", async () => {
-  __setStudentsServiceDependenciesForTests({
+  setDeps({
     executeDbQuery: (async () => ({ rows: [], rowCount: 0 })) as never,
   });
 
@@ -99,7 +103,7 @@ test("updateStudentPartial returns null when payload has no valid fields", async
 test("updateStudentPartial updates and invalidates cache", async () => {
   let invalidated = 0;
 
-  __setStudentsServiceDependenciesForTests({
+  setDeps({
     executeDbQuery: (async () => ({
       rows: [{ id: "s4", name: "Novo", grade: "B", email: "novo@test.com" }],
       rowCount: 1,
@@ -120,7 +124,7 @@ test("updateStudentPartial updates and invalidates cache", async () => {
 test("deleteStudent handles not found and success", async () => {
   let calls = 0;
 
-  __setStudentsServiceDependenciesForTests({
+  setDeps({
     executeDbQuery: (async () => {
       calls += 1;
       if (calls === 1) {
@@ -143,7 +147,7 @@ test("deleteStudent handles not found and success", async () => {
 test("deleteAllStudent clears list and pattern cache", async () => {
   const called: string[] = [];
 
-  __setStudentsServiceDependenciesForTests({
+  setDeps({
     executeDbQuery: (async () => {
       called.push("db");
       return { rows: [], rowCount: 0 };
@@ -165,7 +169,7 @@ test("deleteAllStudent clears list and pattern cache", async () => {
 test("selectAllUsers returns cached list before database", async () => {
   let queried = false;
 
-  __setStudentsServiceDependenciesForTests({
+  setDeps({
     getStudentsListCacheKey: (() => "students:all") as never,
     readCache: (async () => [{ id: "s1", name: "A", grade: "A", email: "a@test.com" }]) as never,
     executeDbQuery: (async () => {
@@ -181,7 +185,7 @@ test("selectAllUsers returns cached list before database", async () => {
 });
 
 test("updateStudentName and updateStudentEmail return true when row exists", async () => {
-  __setStudentsServiceDependenciesForTests({
+  studentsService.__setStudentsServiceDependenciesForTests({
     executeDbQuery: (async () => ({ rows: [{ id: "s6" }], rowCount: 1 })) as never,
     getStudentCacheKey: ((id: string) => `student:${id}`) as never,
     getStudentsListCacheKey: (() => "students:all") as never,

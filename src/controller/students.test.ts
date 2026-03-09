@@ -1,9 +1,30 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createStudentsController } from "./students.ts";
-import { createMockResponse } from "../test-utils/mocks.ts";
 
 const pool = {} as never;
+
+function createResponseMock() {
+  let statusCode = 200;
+  let jsonPayload: unknown;
+
+  return {
+    get statusCode() {
+      return statusCode;
+    },
+    get jsonPayload() {
+      return jsonPayload;
+    },
+    status(code: number) {
+      statusCode = code;
+      return this;
+    },
+    json(payload: unknown) {
+      jsonPayload = payload;
+      return this;
+    },
+  };
+}
 
 function createBaseDependencies() {
   return {
@@ -20,7 +41,7 @@ test("getStudents returns 200 with list", async () => {
   dependencies.selectAllUsers = async () => [{ id: "1", name: "Ana", grade: "A", email: "a@test.com" }];
 
   const controller = createStudentsController(pool, dependencies as never);
-  const response = createMockResponse();
+  const response = createResponseMock();
 
   await controller.getStudents({} as never, response as never, () => undefined);
 
@@ -30,7 +51,7 @@ test("getStudents returns 200 with list", async () => {
 
 test("getById validates id and returns 400", async () => {
   const controller = createStudentsController(pool, createBaseDependencies() as never);
-  const response = createMockResponse();
+  const response = createResponseMock();
 
   await controller.getById({ params: { id: "   " } } as never, response as never, () => undefined);
 
@@ -40,7 +61,7 @@ test("getById validates id and returns 400", async () => {
 
 test("getById returns 404 when student does not exist", async () => {
   const controller = createStudentsController(pool, createBaseDependencies() as never);
-  const response = createMockResponse();
+  const response = createResponseMock();
 
   await controller.getById({ params: { id: "not-found" } } as never, response as never, () => undefined);
 
@@ -50,7 +71,7 @@ test("getById returns 404 when student does not exist", async () => {
 
 test("create validates payload and returns 400", async () => {
   const controller = createStudentsController(pool, createBaseDependencies() as never);
-  const response = createMockResponse();
+  const response = createResponseMock();
 
   await controller.create({ body: { id: 1 } } as never, response as never, () => undefined);
 
@@ -60,7 +81,7 @@ test("create validates payload and returns 400", async () => {
 
 test("create enqueues operation and returns 202", async () => {
   const controller = createStudentsController(pool, createBaseDependencies() as never);
-  const response = createMockResponse();
+  const response = createResponseMock();
 
   await controller.create({ body: { id: "1", name: "A", grade: "A", email: "a@test.com" } } as never, response as never, () => undefined);
 
@@ -69,7 +90,7 @@ test("create enqueues operation and returns 202", async () => {
 
 test("update requires at least one field", async () => {
   const controller = createStudentsController(pool, createBaseDependencies() as never);
-  const response = createMockResponse();
+  const response = createResponseMock();
 
   await controller.update({ params: { id: "1" }, body: {} } as never, response as never, () => undefined);
 
@@ -80,11 +101,11 @@ test("update requires at least one field", async () => {
 test("remove validates id and returns 202 for valid payload", async () => {
   const controller = createStudentsController(pool, createBaseDependencies() as never);
 
-  const badResponse = createMockResponse();
+  const badResponse = createResponseMock();
   await controller.remove({ params: { id: "" } } as never, badResponse as never, () => undefined);
   assert.strictEqual(badResponse.statusCode, 400);
 
-  const goodResponse = createMockResponse();
+  const goodResponse = createResponseMock();
   await controller.remove({ params: { id: "1" } } as never, goodResponse as never, () => undefined);
   assert.strictEqual(goodResponse.statusCode, 202);
 });
@@ -96,7 +117,7 @@ test("internal errors are mapped to 500", async () => {
   };
 
   const controller = createStudentsController(pool, dependencies as never);
-  const response = createMockResponse();
+  const response = createResponseMock();
 
   await controller.getStudents({} as never, response as never, () => undefined);
 

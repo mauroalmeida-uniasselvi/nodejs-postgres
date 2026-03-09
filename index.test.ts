@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { configureRoutes, main } from "./index.ts";
-import { createMockResponse } from "./src/test-utils/mocks.ts";
 
 type AppMock = {
   routes: Record<string, (...args: unknown[]) => unknown>;
@@ -44,6 +43,38 @@ function createAppMock(): AppMock {
   };
 }
 
+function createResponseMock() {
+  const headers = new Map<string, string>();
+  const bodyChunks: string[] = [];
+  let closeHandler: (() => void) | null = null;
+
+  return {
+    headers,
+    bodyChunks,
+    setHeader(key: string, value: string) {
+      headers.set(key, value);
+    },
+    flushHeaders() {
+      return undefined;
+    },
+    write(chunk: string) {
+      bodyChunks.push(chunk);
+      return true;
+    },
+    on(event: string, handler: () => void) {
+      if (event === "close") {
+        closeHandler = handler;
+      }
+      return this;
+    },
+    triggerClose() {
+      if (closeHandler) {
+        closeHandler();
+      }
+    },
+  };
+}
+
 test("configureRoutes registers all API endpoints", () => {
   const app = createAppMock();
 
@@ -64,7 +95,7 @@ test("SSE route sets headers and writes retry hint", () => {
   const app = createAppMock();
   configureRoutes(app as never, {} as never);
 
-  const response = createMockResponse();
+  const response = createResponseMock();
   const handler = app.routes["GET /api/students/events"];
   assert.ok(handler);
 
@@ -87,7 +118,7 @@ test("SSE subscription broadcasts events to connected clients", () => {
     }) as never,
   });
 
-  const response = createMockResponse();
+  const response = createResponseMock();
   const sseHandler = app.routes["GET /api/students/events"];
   assert.ok(sseHandler);
 
