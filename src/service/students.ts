@@ -22,6 +22,20 @@ interface StudentUpdateInput {
 	email?: string;
 }
 
+function isCacheDebugEnabled(): boolean {
+	return (process.env.CACHE_DEBUG || "false").toLowerCase() === "true";
+}
+
+function logCache(message: string): void {
+	if (isCacheDebugEnabled()) {
+		console.log(message);
+	}
+}
+
+async function invalidateStudentCache(id: string): Promise<void> {
+	await invalidateCache([getStudentCacheKey(id), getStudentsListCacheKey()]);
+}
+
 export async function insertStudent(
 	pool: Pool,
 	id: string,
@@ -52,9 +66,7 @@ export async function selectUserById(pool: Pool, id: string): Promise<Student | 
 	const cacheKey = getStudentCacheKey(id);
 	const cachedStudent = await readCache<Student>(cacheKey);
 	if (cachedStudent) {
-		if ((process.env.CACHE_DEBUG || "false").toLowerCase() === "true") {
-			console.log(`[CACHE][selectUserById] source=redis id=${id}`);
-		}
+		logCache(`[CACHE][selectUserById] source=redis id=${id}`);
 		return cachedStudent;
 	}
 
@@ -73,9 +85,7 @@ export async function selectAllUsers(pool: Pool): Promise<Student[]> {
 	const cacheKey = getStudentsListCacheKey();
 	const cachedStudents = await readCache<Student[]>(cacheKey);
 	if (cachedStudents) {
-		if ((process.env.CACHE_DEBUG || "false").toLowerCase() === "true") {
-			console.log("[CACHE][selectAllUsers] source=redis");
-		}
+		logCache("[CACHE][selectAllUsers] source=redis");
 		return cachedStudents;
 	}
 
@@ -102,7 +112,7 @@ export async function updateStudent(
 		return false;
 	}
 
-	await invalidateCache([getStudentCacheKey(id), getStudentsListCacheKey()]);
+	await invalidateStudentCache(id);
 	return true;
 }
 
@@ -115,7 +125,7 @@ export async function updateStudentName(
 	if (!result.rowCount) {
 		return false;
 	}
-	await invalidateCache([getStudentCacheKey(id), getStudentsListCacheKey()]);
+	await invalidateStudentCache(id);
 	return true;
 }
 
@@ -128,7 +138,7 @@ export async function updateStudentEmail(
 	if (!result.rowCount) {
 		return false;
 	}
-	await invalidateCache([getStudentCacheKey(id), getStudentsListCacheKey()]);
+	await invalidateStudentCache(id);
 	return true;
 }
 
@@ -171,7 +181,7 @@ export async function updateStudentPartial(
 		return null;
 	}
 
-	await invalidateCache([getStudentCacheKey(id), getStudentsListCacheKey()]);
+	await invalidateStudentCache(id);
 	return result.rows[0] ?? null;
 }
 
@@ -180,7 +190,7 @@ export async function deleteStudent(pool: Pool, id: string): Promise<boolean> {
 	if (!result.rowCount) {
 		return false;
 	}
-	await invalidateCache([getStudentCacheKey(id), getStudentsListCacheKey()]);
+	await invalidateStudentCache(id);
 	return true;
 }
 

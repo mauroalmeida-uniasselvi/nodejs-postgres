@@ -69,6 +69,10 @@ const events = new EventEmitter();
 let workerRunning = false;
 let workerLoop: Promise<void> | null = null;
 
+function nowIso(): string {
+	return new Date().toISOString();
+}
+
 function getOperationStatusKey(operationId: string): string {
 	return `${OPERATION_STATUS_PREFIX}${operationId}`;
 }
@@ -82,6 +86,39 @@ async function saveOperationStatus(status: OperationStatus): Promise<void> {
 	await redis.set(getOperationStatusKey(status.operationId), JSON.stringify(status), {
 		EX: OPERATION_STATUS_TTL_SECONDS,
 	});
+}
+
+function buildQueuedStatus(operationId: string, type: OperationType, studentId: string): OperationStatus {
+	return {
+		operationId,
+		type,
+		studentId,
+		status: "queued",
+		attempts: 0,
+		updatedAt: nowIso(),
+	};
+}
+
+async function enqueueOperation(
+	type: OperationType,
+	payload: StudentOperationPayload
+): Promise<OperationStatus> {
+	const operationId = randomUUID();
+	const message: QueueMessage = {
+		operationId,
+		type,
+		payload,
+		attempts: 0,
+		queuedAt: nowIso(),
+	};
+
+	const status = buildQueuedStatus(operationId, type, getStudentId(payload));
+	await saveOperationStatus(status);
+
+	const redis = await getRedisClient();
+	await redis.lPush(STUDENTS_QUEUE_KEY, JSON.stringify(message));
+
+	return status;
 }
 
 function isOperationType(value: unknown): value is OperationType {
@@ -139,7 +176,7 @@ async function processQueueMessage(pool: Pool, message: QueueMessage): Promise<v
 		studentId,
 		status: "processing",
 		attempts: attemptNumber,
-		updatedAt: new Date().toISOString(),
+		updatedAt: nowIso(),
 	});
 
 	try {
@@ -179,7 +216,7 @@ async function processQueueMessage(pool: Pool, message: QueueMessage): Promise<v
 			studentId,
 			status: "processed",
 			attempts: attemptNumber,
-			updatedAt: new Date().toISOString(),
+			updatedAt: nowIso(),
 		});
 
 		events.emit("student-updated", {
@@ -196,7 +233,7 @@ async function processQueueMessage(pool: Pool, message: QueueMessage): Promise<v
 				studentId,
 				status: "queued",
 				attempts: attemptNumber,
-				updatedAt: new Date().toISOString(),
+				updatedAt: nowIso(),
 				error: toErrorMessage(error),
 			});
 
@@ -215,7 +252,7 @@ async function processQueueMessage(pool: Pool, message: QueueMessage): Promise<v
 			studentId,
 			status: "failed",
 			attempts: attemptNumber,
-			updatedAt: new Date().toISOString(),
+			updatedAt: nowIso(),
 			error: toErrorMessage(error),
 		});
 	}
@@ -248,84 +285,15 @@ async function runWorker(pool: Pool): Promise<void> {
 }
 
 export async function enqueueCreateStudentOperation(payload: StudentCreatePayload): Promise<OperationStatus> {
-	const operationId = randomUUID();
-	const message: QueueMessage = {
-		operationId,
-		type: "create",
-		payload,
-		attempts: 0,
-		queuedAt: new Date().toISOString(),
-	};
-
-	const status: OperationStatus = {
-		operationId,
-		type: "create",
-		studentId: payload.id,
-		status: "queued",
-		attempts: 0,
-		updatedAt: new Date().toISOString(),
-	};
-
-	await saveOperationStatus(status);
-
-	const redis = await getRedisClient();
-	await redis.lPush(STUDENTS_QUEUE_KEY, JSON.stringify(message));
-
-	return status;
+	return enqueueOperation("create", payload);
 }
 
 export async function enqueueUpdateStudentOperation(payload: StudentUpdatePayload): Promise<OperationStatus> {
-	const operationId = randomUUID();
-	const message: QueueMessage = {
-		operationId,
-		type: "update",
-		payload,
-		attempts: 0,
-		queuedAt: new Date().toISOString(),
-	};
-
-	const status: OperationStatus = {
-		operationId,
-		type: "update",
-		studentId: payload.id,
-		status: "queued",
-		attempts: 0,
-		updatedAt: new Date().toISOString(),
-	};
-
-	await saveOperationStatus(status);
-
-	const redis = await getRedisClient();
-	await redis.lPush(STUDENTS_QUEUE_KEY, JSON.stringify(message));
-
-	return status;
+	return enqueueOperation("update", payload);
 }
 
 export async function enqueueDeleteStudentOperation(payload: StudentDeletePayload): Promise<OperationStatus> {
-	const operationId = randomUUID();
-	const message: QueueMessage = {
-		operationId,
-		type: "delete",
-		payload,
-		attempts: 0,
-		queuedAt: new Date().toISOString(),
-	};
-
-	const status: OperationStatus = {
-		operationId,
-		type: "delete",
-		studentId: payload.id,
-		status: "queued",
-		attempts: 0,
-		updatedAt: new Date().toISOString(),
-	};
-
-	await saveOperationStatus(status);
-
-	const redis = await getRedisClient();
-	await redis.lPush(STUDENTS_QUEUE_KEY, JSON.stringify(message));
-
-	return status;
+	return enqueueOperation("delete", payload);
 }
 
 export function subscribeStudentsUpdates(listener: (event: StudentUpdatedEvent) => void): () => void {
